@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NLP Lab - Journey of a Sentence</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; background: linear-gradient(160deg,#f3f0ff,#ffeef5); min-height: 100vh; color: #2d2a4a; }
+  header { background: #5b4cdb; color: #fff; padding: 14px 10px; text-align: center; position: relative; box-shadow: 0 3px 12px rgba(91,76,219,.35); }
+  header h1 { margin: 0; font-size: 1.5rem; } header p { margin: 4px 0 0; font-size: .85rem; opacity: .85; }
+  #mute { position: absolute; right: 14px; top: 12px; margin: 0; padding: 6px 10px; background: rgba(255,255,255,.2); border-radius: 20px; }
+  nav { display: flex; justify-content: center; gap: 8px; margin: 14px 0 6px; flex-wrap: wrap; }
+  nav button { background: #fff; color: #5b4cdb; border: 2px solid #5b4cdb; }
+  nav button.on { background: #5b4cdb; color: #fff; }
+  main { max-width: 900px; margin: 0 auto; padding: 0 12px 30px; }
+  section { display: none; } section.on { display: block; }
+  button { margin: 6px 4px; padding: 10px 18px; border: 0; border-radius: 8px; background: #5b4cdb; color: #fff; font-size: 1rem; cursor: pointer; transition: transform .1s; }
+  button:hover { opacity: .9; transform: translateY(-1px); } button:active { transform: scale(.95); }
+  button.alt { background: #8a85a8; } button.pink { background: #e0457b; }
+  .hint { color: #8a85a8; } .center { text-align: center; }
+  .sentence { background: #fff; border-radius: 12px; padding: 14px 16px; font-size: 1.15rem; margin: 10px 0; border: 2px dashed #b7b0f5; min-height: 54px; }
+  .steps { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 8px 0; }
+  .step { display: flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 20px; background: #e4e0ff; font-size: .8rem; color: #6a668a; }
+  .step b { background: #fff; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; }
+  .step.done { background: #5b4cdb; color: #fff; } .step.cur { background: #e0457b; color: #fff; transform: scale(1.08); }
+  .stagebox { background: #fff; border-radius: 14px; padding: 16px; min-height: 230px; box-shadow: 0 6px 18px rgba(91,76,219,.15); }
+  .stagebox h3 { margin: 0 0 10px; color: #5b4cdb; }
+  .chip { display: inline-block; margin: 4px; padding: 6px 12px; border-radius: 20px; background: #ece9ff; border: 2px solid #5b4cdb; font-weight: 600; transition: all .7s; }
+  .pop { animation: pop .5s cubic-bezier(.2,1.6,.4,1) both; }
+  @keyframes pop { 0% { transform: scale(.2) rotate(-8deg); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  .chip.stop { border-color: #d98a00; background: #fff4dc; } .chip.punct { border-color: #aaa; background: #eee; }
+  .chip.gone { opacity: 0; transform: translateY(60px) rotate(25deg); max-width: 0; padding: 6px 0; margin: 4px 0; border-width: 0; overflow: hidden; }
+  .chip small { display: block; font-size: .65rem; font-weight: 700; text-transform: uppercase; opacity: 1; }
+  .chip.n { background: #dff3ff; border-color: #2f80c8; } .chip.v { background: #ffe0ea; border-color: #e0457b; }
+  .chip.a { background: #e0f7e4; border-color: #1a9a4a; } .chip.r { background: #fff4dc; border-color: #d98a00; } .chip.o { background: #eee; border-color: #999; }
+  .ent { display: block; background: #5b4cdb; color: #fff; border-radius: 6px; font-size: .6rem; margin-top: 3px; padding: 1px 4px; }
+  table { border-collapse: collapse; width: 100%; } td, th { padding: 6px 10px; border-bottom: 1px solid #eee; text-align: left; }
+  td.diff { color: #e0457b; font-weight: 700; }
+  .bar { background: #ddd8ff; border-radius: 6px; margin: 6px 0; overflow: hidden; }
+  .bar div { background: #5b4cdb; color: #fff; padding: 4px 8px; white-space: nowrap; transition: width .8s; font-size: .9rem; }
+  .bar.top div { background: #e0457b; }
+  canvas.gal { width: 100%; border-radius: 12px; background: #050719; display: block; touch-action: none; }
+  .meter { margin: 14px 0; } .mbar { height: 22px; border-radius: 11px; background: linear-gradient(90deg,#d12c2c,#ffd24d,#1a9a4a); position: relative; }
+  #needle { position: absolute; top: -6px; width: 6px; height: 34px; background: #2d2a4a; border-radius: 3px; left: 50%; transition: left .4s; }
+  .mlab { display: flex; justify-content: space-between; font-size: .85rem; margin-top: 4px; }
+  #mtoks span { display: inline-block; margin: 3px; padding: 4px 10px; border-radius: 14px; background: #ece9ff; animation: pop .4s both; }
+  #mtoks span.last { background: #5b4cdb; color: #fff; }
+  .verdict { font-size: 1.3rem; font-weight: 800; margin-top: 10px; } .good { color: #1a9a4a; } .badc { color: #d12c2c; }
+  .gtools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 8px 0; }
+  .side { background: #fff; border-radius: 12px; padding: 12px; margin-top: 10px; min-height: 60px; }
+  .nb { display: inline-block; background: #ece9ff; border-radius: 14px; padding: 3px 10px; margin: 3px; font-size: .9rem; }
+  .words { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 520px; margin: 14px auto; }
+  .words button { font-size: 1.3rem; padding: 18px 10px; margin: 0; background: #fff; color: #2d2a4a; border: 3px solid #5b4cdb; position: relative; }
+  .words button.right { background: #d4f7de; border-color: #1a9a4a; } .words button.wrong { background: #ffd9d9; border-color: #d12c2c; animation: shake .4s; }
+  .words button .ai { position: absolute; top: 2px; right: 6px; font-size: 1.1rem; }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25%,75% { transform: translateX(-8px); } 50% { transform: translateX(8px); } }
+  .stats { display: flex; justify-content: space-around; font-weight: 600; flex-wrap: wrap; } .stats b { color: #5b4cdb; font-size: 1.3rem; }
+  .timer { height: 10px; background: #ddd8ff; border-radius: 6px; overflow: hidden; max-width: 520px; margin: 8px auto; } .timer div { height: 100%; background: #5b4cdb; transition: width 1s linear; }
+  #modal { position: fixed; inset: 0; background: rgba(35,28,90,.72); display: none; align-items: center; justify-content: center; z-index: 20; }
+  #modal.show { display: flex; } .card { background: #fff; border-radius: 16px; padding: 24px 30px; text-align: center; animation: pop .4s both; }
+  .card h2 { margin: 0 0 8px; color: #5b4cdb; } .final { font-size: 2.2rem; font-weight: 800; color: #e0457b; }
+  /* polish */
+  .fade { animation: fadein .45s; } @keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .spin { width: 34px; height: 34px; border: 4px solid #ddd8ff; border-top-color: #5b4cdb; border-radius: 50%; animation: rot .8s linear infinite; margin: 30px auto 6px; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  .custom { display: flex; gap: 8px; max-width: 680px; margin: 6px auto; flex-wrap: wrap; justify-content: center; }
+  .custom input { flex: 1; min-width: 220px; padding: 10px 14px; border: 2px solid #b7b0f5; border-radius: 8px; font-size: 1rem; }
+  .custom button { margin: 0; }
+  .factory-top-actions { display: flex; justify-content: center; align-items: center; gap: 8px; }
+  .factory-top-actions button { margin: 6px 0; }
+  .stage-actions {
+    display: flex; justify-content: center; margin: 12px auto 0; padding: 7px;
+    width: fit-content; min-width: 190px;
+    border: 1px solid rgba(202,167,255,.25); border-radius: 18px;
+    background: rgba(15,13,43,.84); box-shadow: 0 8px 26px rgba(0,0,0,.4);
+    backdrop-filter: blur(12px);
+  }
+  .stage-actions button { min-width: 170px; margin: 0; }
+  .att span { display: inline-block; margin: 3px; padding: 6px 12px; border-radius: 8px; font-weight: 600; }
+  .att small { display: block; font-size: .65rem; opacity: .85; }
+  .legend { display: flex; align-items: center; gap: 8px; font-size: .8rem; margin: 8px 0; }
+  .legend i { flex: 1; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #d12c2c, #f3f0ff, #1a9a4a); }
+  #hist { max-width: 520px; margin: 12px auto; font-size: .9rem; text-align: center; }
+  body.dark { background: #15132b; color: #e8e6ff; }
+  body.dark .sentence, body.dark .stagebox, body.dark .side, body.dark .card { background: #221f45; color: #e8e6ff; }
+  body.dark .chip { background: #2d2a5a; color: #fff; } body.dark nav button { background: #221f45; color: #cfc9ff; }
+  body.dark nav button.on { background: #5b4cdb; color: #fff; } body.dark .words button { background: #221f45; color: #fff; }
+  body.dark td, body.dark th { border-color: #3a3670; } body.dark .nb, body.dark #mtoks span { background: #2d2a5a; color: #fff; }
+  body.dark #mtoks span.last { background: #5b4cdb; } body.dark .hint { color: #a8a3d6; }
+  body.dark .custom input { background: #221f45; color: #fff; border-color: #5b4cdb; } body.dark .bar { background: #3a3670; }
+
+  /* Cosmic home and shared night-sky theme */
+  :root { color-scheme: dark; }
+  body {
+    min-height: 100vh; overflow-x: hidden; color: #f7efff;
+    background: radial-gradient(ellipse at 50% 30%, #1b1748 0%, #0c0d29 56%, #08091b 100%);
+    font-family: "Segoe UI", Arial, sans-serif;
+  }
+  body::before, body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: -1; }
+  body::before {
+    opacity: .58;
+    background-image:
+      radial-gradient(1px 1px at 8% 18%, #fff 98%, transparent),
+      radial-gradient(1px 1px at 26% 74%, #f8c6ff 98%, transparent),
+      radial-gradient(2px 2px at 48% 32%, #fff 98%, transparent),
+      radial-gradient(1px 1px at 67% 81%, #d7ceff 98%, transparent),
+      radial-gradient(1px 1px at 86% 24%, #fff 98%, transparent),
+      radial-gradient(2px 2px at 93% 66%, #f8c6ff 98%, transparent);
+    background-size: 290px 240px, 360px 300px, 420px 360px, 320px 260px, 380px 320px, 470px 390px;
+    animation: starDrift 70s linear infinite;
+  }
+  body::after { background: radial-gradient(ellipse at center, transparent 38%, rgba(3,4,19,.52) 100%); }
+  @keyframes starDrift { to { background-position: 290px 240px, -360px 300px, 420px -360px, -320px -260px, 380px 320px, -470px 390px; } }
+  header {
+    position: relative; display: flex; align-items: center; justify-content: space-between;
+    max-width: 1160px; margin: 14px auto 0; padding: 10px 18px; text-align: left;
+    border: 1px solid rgba(198,166,255,.32); border-radius: 22px;
+    background: rgba(18,16,51,.76); box-shadow: 0 10px 35px rgba(4,3,20,.36), inset 0 1px rgba(255,255,255,.08);
+    backdrop-filter: blur(18px); z-index: 4;
+  }
+  header h1 { font-size: 1.05rem; letter-spacing: .02em; }
+  header p { margin: 2px 0 0; color: #c9b9f4; font-size: .75rem; }
+  .brand { margin-right: auto; }
+  header h1::before { content: "🪐"; margin-right: 9px; font-size: 1.25rem; vertical-align: -2px; }
+  #dark, #mute { position: static !important; flex: 0 0 auto; margin: 0 0 0 8px; padding: 8px 11px !important; border: 1px solid rgba(255,255,255,.12); background: rgba(132,101,220,.25) !important; }
+  nav {
+    position: relative; z-index: 4; width: fit-content; max-width: calc(100% - 24px);
+    margin: 12px auto 24px; padding: 5px; gap: 5px; border: 1px solid rgba(198,166,255,.22);
+    border-radius: 18px; background: rgba(18,16,51,.66); backdrop-filter: blur(16px);
+  }
+  nav button {
+    margin: 0; padding: 9px 16px; border: 1px solid transparent; border-radius: 12px;
+    color: #d7cafa; background: transparent; font-size: .88rem; transition: .2s ease;
+  }
+  nav button:hover { color: #fff; background: rgba(143,102,255,.18); opacity: 1; }
+  nav button.on { color: #fff; border-color: rgba(224,176,255,.24); background: linear-gradient(135deg,#7954e8,#a347d6); box-shadow: 0 4px 18px rgba(157,76,239,.36); }
+  main { width: min(1160px, 100%); max-width: none; padding: 0 18px 48px; }
+  section.on { animation: sectionIn .45s ease both; }
+  @keyframes sectionIn { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: none; } }
+  button { border-radius: 12px; background: linear-gradient(135deg,#7654e8,#a545d2); box-shadow: 0 5px 16px rgba(119,74,222,.24); transition: transform .2s, box-shadow .2s, background .2s; }
+  button:hover { opacity: 1; transform: translateY(-2px); box-shadow: 0 8px 22px rgba(179,75,225,.34); }
+  button.alt { background: #39345f; color: #e7dcff; }
+  button.pink { background: linear-gradient(100deg,#f143ad,#c64be9); box-shadow: 0 0 24px rgba(244,75,195,.38); }
+  .hint { color: #aaa5d1; }
+  .sentence, .stagebox, .side {
+    color: #f5efff; border: 1px solid rgba(194,164,255,.2);
+    background: rgba(23,21,59,.82); box-shadow: 0 12px 35px rgba(2,2,18,.2);
+  }
+  .sentence { border-style: dashed; }
+  .stagebox h3 { color: #d8b6ff; }
+  .chip.n, .chip.v, .chip.a, .chip.r, .chip.o { color: #201b36; }
+  .chip.n small { color: #16466e; } .chip.v small { color: #76243f; }
+  .chip.a small { color: #175331; } .chip.r small { color: #704300; }
+  .chip.o small { color: #383544; }
+  .step { color: #c0b9dd; background: rgba(116,98,174,.22); }
+  .step b { color: #5a477f; }
+  .step.done { background: #6949c9; color: #fff; }
+  .step.cur { background: #dc43b2; color: #fff; }
+  .chip { color: #fbf8ff; background: #30265a; border-color: #9c69e8; }
+  .custom input { color: #fff; background: rgba(20,18,53,.86); border-color: rgba(186,154,255,.4); }
+  .custom input::placeholder { color: #9690b7; }
+  .bar { background: #282448; } .bar div { background: linear-gradient(90deg,#7654e8,#d14dc6); }
+  .stats { color: #e7dcff; } .stats b { color: #e2a8ff; }
+  .timer { background: #29254d; } .timer div { background: linear-gradient(90deg,#7555ed,#ef4cae); }
+  .words button { color: #f8f2ff; background: rgba(25,22,63,.95); border-color: #9067e2; }
+  .words button.right { color: #fff; background: #176f57; border-color: #4be0a4; }
+  .words button.wrong { background: #762f5a; border-color: #ff6d9d; }
+  #modal { background: rgba(4,3,20,.82); backdrop-filter: blur(8px); }
+  .card { color: #f8efff; border: 1px solid rgba(206,171,255,.3); background: #19163e; }
+  .card h2 { color: #e1b5ff; }
+  body.dark { background: radial-gradient(ellipse at 50% 30%, #100c31 0%, #08091e 58%, #050611 100%); }
+  body.dark .sentence, body.dark .stagebox, body.dark .side, body.dark .card { background: rgba(17,15,45,.95); color: #f3edff; }
+  body.dark .words button { background: #171438; color: #fff; }
+  body.dark .custom input { background: #151234; color: #fff; }
+  body.dark nav button { background: transparent; color: #d8cefa; }
+  body.dark nav button.on { background: linear-gradient(135deg,#7954e8,#a347d6); }
+
+  .home-hero {
+    min-height: 430px; position: relative; display: grid; place-items: center; overflow: hidden;
+    padding: 50px 24px 30px; border: 1px solid rgba(186,154,255,.2); border-radius: 28px;
+    background:
+      radial-gradient(ellipse at 50% 45%, rgba(87,46,158,.28), transparent 49%),
+      radial-gradient(ellipse at 15% 100%, rgba(230,77,162,.17), transparent 37%),
+      linear-gradient(140deg, rgba(14,13,45,.82), rgba(24,16,66,.68));
+    box-shadow: inset 0 0 60px rgba(124,67,211,.08), 0 22px 65px rgba(2,2,18,.25);
+    isolation: isolate;
+  }
+  .home-hero::before {
+    content: ""; position: absolute; width: min(690px,76vw); aspect-ratio: 1; border-radius: 50%;
+    border: 1px solid rgba(181,139,255,.19); box-shadow: 0 0 45px rgba(142,78,221,.09), inset 0 0 45px rgba(142,78,221,.08);
+    animation: orbitSpin 48s linear infinite;
+  }
+  .home-hero::after {
+    content: ""; position: absolute; width: min(530px,60vw); aspect-ratio: 1; border-radius: 50%;
+    border: 1px dashed rgba(241,147,255,.19); animation: orbitSpin 34s linear infinite reverse;
+  }
+  @keyframes orbitSpin { to { transform: rotate(360deg); } }
+  .hero-copy { position: relative; z-index: 2; width: min(660px,100%); text-align: center; }
+  .hero-kicker { margin: 0 0 8px; color: #ffb6f0; font-size: .78rem; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; }
+  .hero-copy h2 {
+    margin: 0; font-size: clamp(3.2rem,9vw,6.3rem); line-height: .98; letter-spacing: -.055em;
+    color: #fff; text-shadow: 0 0 20px rgba(246,135,255,.66), 0 0 54px rgba(147,93,255,.46);
+  }
+  .hero-subtitle { margin: 8px 0 13px; color: #e5aaff; font-size: clamp(1.25rem,3vw,2rem); font-weight: 750; }
+  .hero-description { max-width: 530px; margin: 0 auto; color: #d1c9ee; font-size: 1rem; line-height: 1.7; }
+  .hero-actions { margin-top: 21px; }
+  .hero-actions button { padding: 12px 25px; border-radius: 24px; font-weight: 700; }
+  .hero-actions span { display: inline-block; margin-left: 8px; transition: transform .2s; }
+  .hero-actions button:hover span { transform: translateX(4px); }
+  .orbit-tag {
+    position: absolute; z-index: 2; margin: 0; padding: 7px 13px; border: 1px solid rgba(240,166,255,.5);
+    border-radius: 20px; color: #fff; background: rgba(65,35,119,.66); box-shadow: 0 0 16px rgba(183,83,242,.23);
+    font-size: .8rem; animation: tagFloat 4.5s ease-in-out infinite;
+  }
+  .orbit-tag:hover, .orbit-tag.selected { background: #a239c6; }
+  .orbit-tag:nth-of-type(1) { top: 26%; left: 12%; animation-delay: -.6s; }
+  .orbit-tag:nth-of-type(2) { top: 44%; left: 7%; animation-delay: -2s; }
+  .orbit-tag:nth-of-type(3) { top: 65%; left: 17%; animation-delay: -1.4s; }
+  .orbit-tag:nth-of-type(4) { top: 30%; right: 12%; animation-delay: -2.7s; }
+  .orbit-tag:nth-of-type(5) { top: 51%; right: 8%; animation-delay: -.9s; }
+  .orbit-tag:nth-of-type(6) { top: 70%; right: 17%; animation-delay: -3.2s; }
+  @keyframes tagFloat { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-9px) rotate(2deg); } }
+  .hero-planet {
+    position: absolute; top: 12%; right: 8%; width: 82px; height: 82px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 28%, #ffd1ff, #d268ed 30%, #7650d1 68%, #37266f);
+    box-shadow: inset -12px -10px 19px rgba(18,9,65,.4), 0 0 34px rgba(183,101,255,.36);
+    animation: planetBob 7s ease-in-out infinite;
+  }
+  .hero-planet::after { content: ""; position: absolute; inset: 29px -18px; border: 3px solid rgba(255,168,239,.77); border-radius: 50%; transform: rotate(-24deg); }
+  @keyframes planetBob { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-13px) rotate(8deg); } }
+  .hero-cat {
+    position: absolute; z-index: 1; bottom: 8px; left: 7%; font-size: clamp(5rem,12vw,8.5rem);
+    filter: grayscale(1) brightness(.38) drop-shadow(0 10px 20px rgba(0,0,0,.4)); transform-origin: center bottom;
+    animation: catSway 5.2s ease-in-out infinite;
+  }
+  .hero-cat::after { content: "✦"; position: absolute; top: 3px; right: -12px; color: #ffd1fb; font-size: 1.1rem; animation: twinkle 1.8s ease-in-out infinite; }
+  @keyframes catSway { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-7px) rotate(1.5deg); } }
+  @keyframes twinkle { 0%,100% { opacity: .35; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.25); } }
+  .home-note { min-height: 24px; margin: 6px 0 0; color: #e7b5ff; font-size: .85rem; }
+  .feature-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; margin: -4px 4% 0; position: relative; z-index: 2; }
+  .feature-card {
+    display: flex; align-items: center; gap: 13px; width: 100%; min-height: 90px; margin: 0; padding: 15px;
+    color: #fff; text-align: left; border: 1px solid rgba(202,167,255,.32); border-radius: 16px;
+    background: linear-gradient(135deg,rgba(40,31,86,.95),rgba(83,40,114,.9));
+    box-shadow: 0 12px 30px rgba(3,2,18,.38); backdrop-filter: blur(12px);
+  }
+  .feature-icon { display: grid; place-items: center; flex: 0 0 46px; width: 46px; height: 46px; border-radius: 14px; background: rgba(224,112,255,.18); font-size: 1.6rem; }
+  .feature-text { flex: 1; } .feature-text b { display: block; font-size: 1rem; }
+  .feature-text small { display: block; margin-top: 4px; color: #c8bde6; font-size: .75rem; line-height: 1.4; }
+  .feature-arrow { color: #f0adff; font-size: 1.2rem; }
+  .feature-card:hover { border-color: rgba(247,169,255,.8); background: linear-gradient(135deg,rgba(66,43,130,.98),rgba(126,47,137,.96)); }
+  .journey-ribbon { width: fit-content; max-width: 100%; margin: 18px auto 0; padding: 8px 16px; border: 1px solid rgba(201,165,255,.23); border-radius: 22px; color: #cec3e9; background: rgba(26,22,65,.72); font-size: .78rem; text-align: center; }
+  .journey-ribbon span { color: #f2a9fa; margin: 0 4px; }
+  @media (max-width: 700px) {
+    header { margin: 8px 10px 0; padding: 9px 12px; }
+    nav { margin: 10px auto 18px; }
+    nav button { padding: 8px 10px; font-size: .78rem; }
+    main { padding: 0 10px 32px; }
+    .home-hero { min-height: 430px; padding: 44px 16px 30px; }
+    .hero-planet { width: 54px; height: 54px; right: 8%; top: 9%; }
+    .hero-planet::after { inset: 19px -12px; border-width: 2px; }
+    .orbit-tag { font-size: .68rem; padding: 6px 9px; }
+    .orbit-tag:nth-of-type(1) { left: 4%; top: 27%; }
+    .orbit-tag:nth-of-type(2) { left: 3%; top: 48%; }
+    .orbit-tag:nth-of-type(3) { left: 7%; top: 68%; }
+    .orbit-tag:nth-of-type(4) { right: 4%; top: 28%; }
+    .orbit-tag:nth-of-type(5) { right: 2%; top: 50%; }
+    .orbit-tag:nth-of-type(6) { right: 6%; top: 70%; }
+    .hero-cat { left: 50%; bottom: -3px; font-size: 5rem; transform: translateX(-50%); opacity: .5; }
+    @keyframes catSway { 0%,100% { transform: translateX(-50%) translateY(0) rotate(-2deg); } 50% { transform: translateX(-50%) translateY(-7px) rotate(1.5deg); } }
+    .feature-grid { grid-template-columns: 1fr; margin: 12px 0 0; gap: 9px; }
+    .feature-card { min-height: 72px; }
+    .stage-actions { min-width: 0; width: calc(100% - 12px); }
+    .stage-actions button { width: 100%; }
+  }
+  body.dark .chip.n, body.dark .chip.v, body.dark .chip.a, body.dark .chip.r, body.dark .chip.o { color: #201b36; }
+  body.dark .chip.n small { color: #16466e; } body.dark .chip.v small { color: #76243f; }
+  body.dark .chip.a small { color: #175331; } body.dark .chip.r small { color: #704300; }
+  body.dark .chip.o small { color: #383544; }
+  body.dark .stage-actions { background: rgba(12,10,35,.9); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>NLP Lab: Journey of a Sentence</h1>
+    <p>Tokenize &rarr; Clean &rarr; Tag &rarr; Weigh &rarr; Embed &rarr; Predict</p>
+  </div>
+  <button id="dark" title="Dark mode" style="position:absolute;left:14px;top:12px;margin:0;padding:6px 10px;background:rgba(255,255,255,.2);border-radius:20px">&#127769;</button>
+  <button id="mute" title="Sound on/off">&#128266;</button>
+</header>
+<nav>
+  <button class="on" data-tab="home">&#127968; Home</button>
+  <button data-tab="factory">&#127981; Factory</button>
+  <button data-tab="galaxy">&#127756; Galaxy</button>
+  <button data-tab="game">&#127918; Odd One Out</button>
+</nav>
+<main>
+  <!-- HOME -->
+  <section id="home" class="on">
+    <div class="home-hero">
+      <div class="hero-planet" aria-hidden="true"></div>
+      <button type="button" class="orbit-tag" data-note="Tokenize: split a sentence into words and punctuation.">tokens</button>
+      <button type="button" class="orbit-tag" data-note="Words are cleaned before the model looks for meaning.">words</button>
+      <button type="button" class="orbit-tag" data-note="Embeddings place words with similar meanings close together.">vectors</button>
+      <button type="button" class="orbit-tag" data-note="Explore how each word lands in the embedding galaxy.">embeddings</button>
+      <button type="button" class="orbit-tag" data-note="The model predicts whether a review is positive or negative.">predict</button>
+      <button type="button" class="orbit-tag" data-note="Named entities and part-of-speech tags add useful context.">language</button>
+      <div class="hero-copy">
+        <p class="hero-kicker">Explore natural language processing</p>
+        <h2>NLP Lab</h2>
+        <p class="hero-subtitle">Journey of a Sentence</p>
+        <p class="hero-description">Turn a simple sentence into meaningful insights with the power of Natural Language Processing.</p>
+        <div class="hero-actions"><button class="pink" id="homeStart">Get Started <span aria-hidden="true">&rarr;</span></button></div>
+        <p class="home-note" id="homeNote" aria-live="polite"></p>
+      </div>
+      <div class="hero-cat" aria-label="A curious cat watching the stars" role="img">&#128008;</div>
+    </div>
+    <div class="feature-grid">
+      <button class="feature-card" data-go="factory">
+        <span class="feature-icon" aria-hidden="true">&#127981;</span><span class="feature-text"><b>Factory</b><small>Process a sentence step by step</small></span><span class="feature-arrow" aria-hidden="true">&rarr;</span>
+      </button>
+      <button class="feature-card" data-go="galaxy">
+        <span class="feature-icon" aria-hidden="true">&#127756;</span><span class="feature-text"><b>Galaxy</b><small>Explore word vectors in space</small></span><span class="feature-arrow" aria-hidden="true">&rarr;</span>
+      </button>
+      <button class="feature-card" data-go="game">
+        <span class="feature-icon" aria-hidden="true">&#127918;</span><span class="feature-text"><b>Odd One Out</b><small>Play and test your NLP skills</small></span><span class="feature-arrow" aria-hidden="true">&rarr;</span>
+      </button>
+    </div>
+    <div class="journey-ribbon">Tokenize <span>&rarr;</span> Clean <span>&rarr;</span> Tag <span>&rarr;</span> Weigh <span>&rarr;</span> Embed <span>&rarr;</span> Predict</div>
+  </section>
+
+  <!-- FACTORY -->
+  <section id="factory">
+    <div class="factory-top-actions">
+      <button id="newS" class="pink">New Sentence</button>
+      <button id="autoS" class="alt">Auto-play</button>
+    </div>
+    <div class="custom">
+      <input id="customIn" maxlength="300" placeholder="Optional: type your own sentence, e.g. Tom Hanks gave a brilliant performance in Hollywood.">
+      <button id="customBtn" class="pink">Analyze</button>
+    </div>
+    <p class="hint center" style="margin:2px 0 0;font-size:.8rem">Shortcuts: &rarr; or Space = next stage, N = new sentence</p>
+    <div class="steps" id="steps"></div>
+    <div class="sentence" id="sentence"><span class="hint">Press "New Sentence" to pick a random movie-review sentence.</span></div>
+    <div class="stagebox" id="stage"><p class="hint">The sentence will travel through 7 NLP stages. Press <b>Next Stage</b>.</p></div>
+    <div class="stage-actions"><button id="nextS">Next Stage &#9654;</button></div>
+  </section>
+
+  <!-- GALAXY -->
+  <section id="galaxy">
+    <div class="gtools">
+      <label><input type="checkbox" id="sentMode"> Colour by sentiment (red = negative, green = positive)</label>
+      <button class="alt" id="resetView">Reset view</button>
+    </div>
+    <canvas id="galCv" class="gal" width="900" height="520"></canvas>
+    <p class="hint">Hover over a word, click to see its nearest neighbours. Drag to move, scroll to zoom. Similar words sit close together because they were trained with Word2Vec (skip-gram).</p>
+    <div class="side" id="galSide">Click a word to see its neighbours.</div>
+    <div class="side" id="analogyBox" style="display:none"><b>GloVe analogies</b> (click one):<br><span id="analogyChips"></span><div id="analogyOut" style="margin-top:8px;font-size:1.2rem"></div></div>
+  </section>
+
+  <!-- GAME -->
+  <section id="game">
+    <div class="stats"><span>You: <b id="gScore">0</b></span><span>AI: <b id="gAi">0</b></span><span>Round: <b id="gRound">-</b>/8</span><span>Streak: <b id="gStreak">0</b> &#128293;</span><span>Best: <b id="gBest">0</b> &#127942;</span></div>
+    <div class="timer"><div id="gTimer" style="width:100%"></div></div>
+    <p class="center" style="font-size:1.2rem" id="gMsg">Tap the word that does <b>not</b> belong. The AI decides using word-embedding distances.</p>
+    <div class="words" id="gWords"></div>
+    <div class="center"><button id="gStart" class="pink">Start Game</button></div>
+    <div id="hist"></div>
+  </section>
+</main>
+<div id="modal"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* ---------- sound ---------- */
+let actx = null, muted = false;
+function unlock() { const A = window.AudioContext || window.webkitAudioContext; if (!actx && A) actx = new A(); if (actx && actx.state === "suspended") actx.resume(); }
+function tone(f, t0, d, type, v, f2) {
+  if (muted || !actx) return; const t = actx.currentTime + t0, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type || "sine"; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+  g.gain.setValueAtTime(v || .12, t); g.gain.exponentialRampToValueAtTime(.001, t + d); o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + d + .05);
+}
+const sfx = {
+  pop() { tone(660, 0, .07, "triangle", .08); }, next() { tone(440, 0, .12, "sine", .1, 660); },
+  ok() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * .09, .2, "triangle", .15)); },
+  bad() { tone(220, 0, .35, "sawtooth", .1, 100); }, tick() { tone(1000, 0, .05, "square", .04); }
+};
+$("mute").onclick = () => { muted = !muted; $("mute").innerHTML = muted ? "&#128263;" : "&#128266;"; unlock(); };
+
+/* ---------- tabs ---------- */
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  unlock();
+  if (b.dataset.tab !== "game" && $("game").classList.contains("on")) leaveGame();
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id === b.dataset.tab));
+  if (b.dataset.tab === "galaxy") { initGalaxyTab(); }
+});
+document.querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
+  const tab = document.querySelector(`nav button[data-tab="${b.dataset.go}"]`);
+  if (tab) tab.click();
+});
+document.querySelectorAll(".orbit-tag").forEach(tag => tag.onclick = () => {
+  document.querySelectorAll(".orbit-tag").forEach(item => item.classList.toggle("selected", item === tag));
+  $("homeNote").textContent = tag.dataset.note;
+});
+$("homeStart").onclick = () => {
+  document.querySelector('nav button[data-tab="factory"]').click();
+  $("newS").click();
+};
+
+/* ---------- galaxy drawing (shared) ---------- */
+let G = null, GIDX = {};
+async function requestJson(url, options) {
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch (error) {
+    throw new Error("Cannot reach the NLP service. Run `python app.py` and open http://127.0.0.1:5000.");
+  }
+  if (!response.ok) {
+    throw new Error(`NLP service request failed (${response.status}). Run \`python app.py\` and open http://127.0.0.1:5000 instead of opening index.html directly.`);
+  }
+  return response.json();
+}
+async function loadGalaxy() {
+  if (G) return;
+  const data = await requestJson("/api/galaxy");
+  if (!Array.isArray(data.words) || !Array.isArray(data.x) || !Array.isArray(data.y) ||
+      !Array.isArray(data.cluster) || !Array.isArray(data.sentiment)) {
+    throw new Error("Galaxy data is incomplete.");
+  }
+  G = data;
+  G.words.forEach((w, i) => GIDX[w] = i);
+}
+const view = { s: 1, ox: 0, oy: 0 };
+function gpos(cv, i, v) { return [cv.width / 2 + G.x[i] * v.s * cv.width * .45 + v.ox, cv.height / 2 + G.y[i] * v.s * cv.height * .45 + v.oy]; }
+function drawCosmos(c, w, h) {
+  const bg = c.createLinearGradient(0, 0, w, h);
+  bg.addColorStop(0, "#050719"); bg.addColorStop(.52, "#090b27"); bg.addColorStop(1, "#040616");
+  c.fillStyle = bg; c.fillRect(0, 0, w, h);
+
+  for (let i = 0; i < 520; i++) {
+    const seed = i * 127.1 + 311.7;
+    const x = ((Math.sin(seed) * 43758.5453) % 1 + 1) % 1 * w;
+    const y = ((Math.sin(seed + 78.233) * 24634.6345) % 1 + 1) % 1 * h;
+    const r = i % 19 === 0 ? 1.5 : .55 + (i % 5) * .12;
+    c.globalAlpha = .25 + ((i * 13) % 7) * .08;
+    c.fillStyle = i % 7 === 0 ? "#ffc8fa" : i % 5 === 0 ? "#9ccaff" : "#ffffff";
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    if (i % 47 === 0) {
+      c.globalAlpha = .32; c.fillRect(x - 5, y - .5, 10, 1); c.fillRect(x - .5, y - 5, 1, 10);
+    }
+  }
+
+}
+function drawGal(cv, o) {
+  o = o || {}; const v = o.view || { s: 1, ox: 0, oy: 0 }, c = cv.getContext("2d");
+  drawCosmos(c, cv.width, cv.height);
+  const dim = o.hl && o.hl.length > 0;
+  for (let i = 0; i < G.words.length; i++) {
+    const [x, y] = gpos(cv, i, v);
+    if (x < -5 || y < -5 || x > cv.width + 5 || y > cv.height + 5) continue;
+    c.fillStyle = o.sent ? `hsl(${G.sentiment[i] * 120},80%,55%)` : `hsl(${G.cluster[i] * 12},75%,62%)`;
+    c.globalAlpha = dim ? .35 : .85; c.beginPath(); c.arc(x, y, 2.4 * Math.min(v.s, 2.5) ** .4, 0, 7); c.fill();
+  }
+  c.globalAlpha = 1; c.font = "bold 14px Segoe UI"; c.textAlign = "center";
+  const lab = (i, col, r) => {
+    const [x, y] = gpos(cv, i, v); c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+    c.fillStyle = "#fff"; c.strokeStyle = "#12103a"; c.lineWidth = 3; c.strokeText(G.words[i], x, y - r - 5); c.fillText(G.words[i], x, y - r - 5);
+  };
+  if (o.focus >= 0 && o.nb) { const [fx, fy] = gpos(cv, o.focus, v); o.nb.forEach(j => { const [x, y] = gpos(cv, j, v); c.strokeStyle = "rgba(255,255,255,.5)"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(fx, fy); c.lineTo(x, y); c.stroke(); }); o.nb.forEach(j => lab(j, "#ffd24d", 5)); }
+  if (o.hl) o.hl.forEach(j => lab(j, "#ff4d94", 7));
+  if (o.focus >= 0) lab(o.focus, "#fff", 8);
+  if (o.hover >= 0) lab(o.hover, "#7dffb0", 6);
+}
+
+/* ---------- FACTORY ---------- */
+const STAGES = ["Tokenize", "Stop words", "Stem & Lemma", "POS & NER", "TF-IDF", "Galaxy", "LSTM", "Attention"];
+const LAST = () => STAGES.length;
+let D = null, st = 0, autoT = null, runId = 0;
+function renderSteps() { $("steps").innerHTML = STAGES.map((s, i) => `<div class="step ${i < st ? "done" : ""} ${i === st - 1 ? "cur" : ""}"><b>${i + 1}</b>${s}</div>`).join(""); }
+function tagClass(t) { return t.startsWith("NN") ? "n" : t.startsWith("VB") ? "v" : t.startsWith("JJ") ? "a" : t.startsWith("RB") ? "r" : "o"; }
+const TAGNAME = { n: "noun", v: "verb", a: "adj", r: "adv", o: "other" };
+
+async function analyze(text, truth) {
+  stopAuto(); runId++; st = 0; renderSteps();
+  $("sentence").textContent = text;
+  $("stage").innerHTML = '<div class="spin"></div><p class="hint center">Analyzing...</p>';
+  try {
+    D = await requestJson("/api/process", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }) });
+  } catch (e) {
+    D = null;
+    $("stage").innerHTML = "";
+    const error = document.createElement("p");
+    error.className = "badc";
+    error.textContent = e.message || "Could not analyze that text.";
+    $("stage").appendChild(error);
+    return;
+  }
+  D.truth = truth || null;
+  $("stage").innerHTML = '<p class="hint">Ready! Press <b>Next Stage</b> (or the &rarr; key).</p>'; $("nextS").innerHTML = "Next Stage &#9654;";
+}
+async function newSentence() {
+  stopAuto();
+  try {
+    const s = await requestJson("/api/sample");
+    await analyze(s.text, s.label);
+  } catch (e) {
+    D = null;
+    $("stage").innerHTML = "";
+    const error = document.createElement("p");
+    error.className = "badc";
+    error.textContent = e.message || "Could not load a sentence.";
+    $("stage").appendChild(error);
+  }
+}
+function customSentence() {
+  unlock(); const t = $("customIn").value.trim();
+  if (!t) { $("customIn").focus(); return; }
+  analyze(t, null);
+}
+async function nextStage() {
+  unlock(); if (!D) { await newSentence(); if (!D) return; }
+  if (st >= LAST()) { await newSentence(); return; }
+  st++; runId++; renderSteps(); sfx.next();
+  $("stage").classList.remove("fade"); void $("stage").offsetWidth; $("stage").classList.add("fade");
+  $("nextS").innerHTML = st >= LAST() ? "New Sentence &#9654;" : "Next Stage &#9654;";
+  await STAGE[st - 1](runId);
+}
+let autoOn = false;
+function stopAuto() { autoOn = false; $("autoS").textContent = "Auto-play"; }
+$("newS").onclick = () => { unlock(); newSentence(); };
+$("nextS").onclick = nextStage;
+$("customBtn").onclick = customSentence;
+$("customIn").addEventListener("keydown", e => { if (e.key === "Enter") customSentence(); });
+$("autoS").onclick = async () => {
+  unlock(); if (autoOn) { stopAuto(); return; }
+  autoOn = true; $("autoS").textContent = "Stop auto";
+  if (!D || st >= LAST()) { await newSentence(); if (!D) { stopAuto(); return; } autoOn = true; $("autoS").textContent = "Stop auto"; }
+  while (autoOn && st < LAST()) { await nextStage(); if (!autoOn) break; await sleep(2200); }
+  stopAuto();
+};
+
+const STAGE = [
+  // 1 tokenize
+  async () => {
+    $("stage").innerHTML = `<h3>1. Tokenization</h3><p>The sentence is split into <b>${D.rows.length}</b> tokens (words and punctuation).</p><div>` +
+      D.rows.map((r, i) => `<span class="chip pop" style="animation-delay:${i * 70}ms">${esc(r.tok)}</span>`).join("") + "</div>";
+    D.rows.forEach((r, i) => setTimeout(sfx.pop, i * 70));
+  },
+  // 2 stop words
+  async (id) => {
+    const rem = D.rows.filter(r => r.kind !== "keep").length;
+    $("stage").innerHTML = `<h3>2. Stop-word & punctuation removal</h3><p>Orange = stop words, grey = punctuation. <b>${rem}</b> of ${D.rows.length} tokens are removed.</p><div id="c2">` +
+      D.rows.map(r => `<span class="chip ${r.kind}">${esc(r.tok)}</span>`).join("") + "</div>";
+    await sleep(1000); if (id !== runId) return;
+    document.querySelectorAll("#c2 .chip.stop, #c2 .chip.punct").forEach(e => e.classList.add("gone")); sfx.bad();
+  },
+  // 3 stem & lemma
+  async () => {
+    const k = D.rows.filter(r => r.kind === "keep");
+    $("stage").innerHTML = `<h3>3. Stemming vs Lemmatization</h3><p>Stemming chops word endings (Porter); lemmatization finds the real dictionary form.</p><table><tr><th>Word</th><th>Stem</th><th>Lemma</th></tr>` +
+      k.map(r => `<tr><td>${esc(r.tok)}</td><td class="${r.stem !== r.tok.toLowerCase() ? "diff" : ""}">${esc(r.stem)}</td><td class="${r.lemma !== r.tok.toLowerCase() ? "diff" : ""}">${esc(r.lemma)}</td></tr>`).join("") + "</table>";
+  },
+  // 4 POS & NER
+  async () => {
+    const k = D.rows.filter(r => r.kind !== "punct");
+    $("stage").innerHTML = `<h3>4. Part-of-Speech tags & Named Entities</h3><p>Blue = noun, pink = verb, green = adjective, orange = adverb. Purple badge = named entity.</p><div>` +
+      k.map((r, i) => { const c = tagClass(r.tag); return `<span class="chip ${c} pop" style="animation-delay:${i * 60}ms">${esc(r.tok)}<small>${TAGNAME[c]} (${r.tag})</small>${r.ent ? `<span class="ent">${r.ent}</span>` : ""}</span>`; }).join("") + "</div>";
+  },
+  // 5 TF-IDF
+  async () => {
+    const ks = D.keywords.slice(0, 8), mx = ks.length ? ks[0].tfidf : 1;
+    $("stage").innerHTML = `<h3>5. Bag-of-Words & TF-IDF</h3><p>Rare, meaningful words get a higher TF-IDF score. Top keyword: <b>${ks.length ? esc(ks[0].word) : "-"}</b></p>` +
+      ks.map((k, i) => `<div class="bar ${i === 0 ? "top" : ""}"><div style="width:0" data-w="${Math.max(k.tfidf / mx * 100, 18)}">${esc(k.word)} &middot; ${k.tfidf}</div></div>`).join("") +
+      `<p class="hint">BoW counts: ${D.keywords.map(k => `${esc(k.word)}:${k.count}`).join(", ")}</p>`;
+    await sleep(60); document.querySelectorAll("#stage .bar div").forEach(d => d.style.width = d.dataset.w + "%");
+  },
+  // 6 galaxy
+  async () => {
+    await loadGalaxy();
+    $("stage").innerHTML = `<h3>6. Word Embeddings: landing on the Galaxy</h3><p>Each word becomes a 100-dimensional Word2Vec vector. Your words (pink) on the map of ${G.words.length} words; similar meanings sit close together.</p><canvas id="fcv" class="gal" width="800" height="420"></canvas>`;
+    drawGal($("fcv"), { hl: D.points.map(w => GIDX[w]).filter(i => i !== undefined) }); sfx.ok();
+  },
+  // 7 LSTM meter
+  async (id) => {
+    const m = D.meter;
+    $("stage").innerHTML = `<h3>7. BiLSTM reads the sentence word by word</h3><div class="meter"><div class="mbar"><div id="needle"></div></div><div class="mlab"><span>&#128544; Negative</span><span>Positive &#128512;</span></div></div><div id="mtoks"></div><div id="mv" class="verdict"></div>`;
+    if (!m.tokens.length) return;
+    for (let i = 0; i < m.tokens.length; i++) {
+      if (id !== runId) return;
+      document.querySelectorAll("#mtoks span").forEach(s => s.classList.remove("last"));
+      $("mtoks").insertAdjacentHTML("beforeend", `<span class="last">${esc(m.tokens[i])}</span>`);
+      $("needle").style.left = `calc(${m.probs[i] * 100}% - 3px)`; sfx.tick(); await sleep(520);
+    }
+    if (id !== runId) return;
+    const S = D.sentiment || { lstm: m.probs[m.probs.length - 1], vader: 0, combined: m.probs[m.probs.length - 1] };
+    const p = S.combined, pred = p >= .5 ? "positive" : "negative", ok = pred === D.truth;
+    $("needle").style.left = `calc(${p * 100}% - 3px)`;
+    const sure = `${(Math.max(p, 1 - p) * 100).toFixed(1)}% sure`;
+    $("mv").innerHTML = D.truth
+      ? `Model says <b>${pred.toUpperCase()}</b> (${sure}) &middot; <span class="${ok ? "good" : "badc"}">${ok ? "Correct!" : "Wrong"} (review was ${D.truth})</span>`
+      : `Model says <b>${pred.toUpperCase()}</b> (${sure})`;
+    $("mv").insertAdjacentHTML("beforeend", `<div class="hint" style="font-size:.85rem;font-weight:400;margin-top:6px">BiLSTM alone: ${(S.lstm * 100).toFixed(0)}% positive &middot; VADER lexicon score: ${S.vader.toFixed(2)} &middot; combined: ${(S.combined * 100).toFixed(0)}% positive</div>`);
+    (!D.truth || ok) ? sfx.ok() : sfx.bad();
+  },
+  // 8 attention-style word importance (occlusion)
+  async (id) => {
+    const m = D.meter, imp = D.importance || [];
+    if (!m.tokens.length) { $("stage").innerHTML = "<h3>8. Attention view</h3><p>No words to explain.</p>"; return; }
+    const mx = Math.max(...imp.map(v => Math.abs(v)), 1e-6);
+    $("stage").innerHTML = `<h3>8. Attention view: which words drove the decision?</h3>
+      <p>Each word is removed in turn and the change in the model's score is measured. <b style="color:#1a9a4a">Green</b> = pushes towards <b>positive</b>, <b style="color:#d12c2c">red</b> = pushes towards <b>negative</b>. A stronger colour means a more important word.</p>
+      <div class="legend"><span>Negative</span><i></i><span>Positive</span></div>
+      <div class="att" id="att"></div><div id="attTop" class="verdict"></div>
+      <p class="hint" style="font-size:.8rem">Note: this is an occlusion-based explanation, similar in spirit to attention weights. The BiLSTM itself has no attention layer.</p>`;
+    for (let i = 0; i < m.tokens.length; i++) {
+      if (id !== runId) return;
+      const v = imp[i] / mx, a = Math.min(Math.abs(v), 1), col = v >= 0 ? "26,154,74" : "209,44,44";
+      $("att").insertAdjacentHTML("beforeend", `<span class="pop" style="background:rgba(${col},${(0.12 + a * 0.75).toFixed(2)});color:${a > .55 ? "#fff" : "inherit"}">${esc(m.tokens[i])}<small>${v >= 0 ? "+" : ""}${(imp[i] * 100).toFixed(1)}</small></span>`);
+      sfx.pop(); await sleep(140);
+    }
+    let k = 0; imp.forEach((v, i) => { if (Math.abs(v) > Math.abs(imp[k])) k = i; });
+    if (id === runId) $("attTop").innerHTML = `Most influential word: <b>${esc(m.tokens[k])}</b> (${imp[k] >= 0 ? "pushes positive" : "pushes negative"})`;
+  }
+];
+
+/* ---------- GALAXY TAB ---------- */
+let gInit = false, gS = { focus: -1, nb: [], hover: -1 }, drag = null, moved = 0;
+function redrawGal() { drawGal($("galCv"), { view, sent: $("sentMode").checked, focus: gS.focus, nb: gS.nb, hover: gS.hover }); }
+async function initGalaxyTab() {
+  const cv = $("galCv");
+  drawCosmos(cv.getContext("2d"), cv.width, cv.height);
+  try {
+    await loadGalaxy();
+  } catch (error) {
+    $("galSide").textContent = `${error.message} Galaxy word data could not be loaded.`;
+    return;
+  }
+  let infoError = null;
+  if (!gInit) {
+    let info = { glove: false };
+    try {
+      info = await requestJson("/api/info");
+    } catch (error) {
+      infoError = error;
+    }
+    if (info.glove) {
+      $("analogyBox").style.display = "block";
+      const A = [["king,woman", "man"], ["paris,italy", "france"], ["walking,swam", "walked"], ["london,japan", "england"], ["brother,woman", "man"]];
+      $("analogyChips").innerHTML = A.map((a, i) => `<button class="alt" data-i="${i}">${a[0].split(",")[0]} &minus; ${a[1]} + ${a[0].split(",")[1]}</button>`).join("");
+      $("analogyChips").querySelectorAll("button").forEach(b => b.onclick = async () => {
+        unlock(); const a = A[b.dataset.i];
+        const r = await (await fetch(`/api/analogy?pos=${a[0]}&neg=${a[1]}`)).json();
+        $("analogyOut").innerHTML = `${a[0].split(",")[0]} &minus; ${a[1]} + ${a[0].split(",")[1]} = <b style="color:#e0457b">${r.length ? r[0].word : "?"}</b> <span class="hint">(also: ${r.slice(1).map(x => x.word).join(", ")})</span>`; sfx.ok();
+      });
+    }
+    const near = (e) => {
+      const r = cv.getBoundingClientRect(), mx = (e.clientX - r.left) * cv.width / r.width, my = (e.clientY - r.top) * cv.height / r.height;
+      let best = -1, bd = 14 * 14;
+      for (let i = 0; i < G.words.length; i++) { const [x, y] = gpos(cv, i, view); const d = (x - mx) ** 2 + (y - my) ** 2; if (d < bd) { bd = d; best = i; } }
+      return { best, mx, my };
+    };
+    cv.addEventListener("mousemove", e => {
+      if (drag) { view.ox += (e.clientX - drag.x) * cv.width / cv.getBoundingClientRect().width; view.oy += (e.clientY - drag.y) * cv.height / cv.getBoundingClientRect().height; moved += 1; drag = { x: e.clientX, y: e.clientY }; }
+      else gS.hover = near(e).best; redrawGal();
+    });
+    cv.addEventListener("mousedown", e => { drag = { x: e.clientX, y: e.clientY }; moved = 0; });
+    addEventListener("mouseup", () => drag = null);
+    cv.addEventListener("click", async e => {
+      if (moved > 3) return; const i = near(e).best; if (i < 0) return; unlock(); sfx.pop();
+      const nb = await (await fetch("/api/neighbors?word=" + G.words[i])).json();
+      gS.focus = i; gS.nb = nb.map(n => GIDX[n.word]).filter(j => j !== undefined); redrawGal();
+      $("galSide").innerHTML = `<b>${esc(G.words[i])}</b> is closest to: ` + nb.map(n => `<span class="nb">${esc(n.word)} <small>${n.sim}</small></span>`).join("") +
+        `<br><small class="hint">Sentiment score of this word alone: ${G.sentiment[i]} (0 = negative, 1 = positive)</small>`;
+    });
+    cv.addEventListener("wheel", e => {
+      e.preventDefault(); const f = e.deltaY < 0 ? 1.15 : .87, r = cv.getBoundingClientRect();
+      const mx = (e.clientX - r.left) * cv.width / r.width - cv.width / 2, my = (e.clientY - r.top) * cv.height / r.height - cv.height / 2;
+      view.ox = mx - (mx - view.ox) * f; view.oy = my - (my - view.oy) * f; view.s = Math.min(Math.max(view.s * f, .6), 12); redrawGal();
+    }, { passive: false });
+    $("sentMode").onchange = redrawGal;
+    $("resetView").onclick = () => { view.s = 1; view.ox = 0; view.oy = 0; gS = { focus: -1, nb: [], hover: -1 }; redrawGal(); };
+    gInit = true;
+  }
+  redrawGal();
+  if (infoError) $("galSide").textContent = `Galaxy loaded. GloVe extras are unavailable: ${infoError.message}`;
+}
+
+/* ---------- GAME: ODD ONE OUT ---------- */
+const gm = { round: 0, score: 0, ai: 0, streak: 0, t: 15, timer: null, advance: null, cur: null, locked: true, active: false, paused: false, awaitingNext: false, loading: false, run: 0 };
+const TOTAL = 8;
+function startGame() {
+  unlock();
+  gm.run++; gm.active = true; gm.paused = false; gm.awaitingNext = false;
+  Object.assign(gm, { round: 0, score: 0, ai: 0, streak: 0, cur: null, locked: true, loading: false });
+  $("gScore").textContent = 0; $("gAi").textContent = 0; $("gRound").textContent = "-"; $("gStreak").textContent = 0;
+  $("gTimer").style.width = "100%"; $("gWords").innerHTML = "";
+  $("gMsg").innerHTML = "Which word does <b>not</b> belong?";
+  $("gStart").textContent = "Pause Game";
+  $("modal").classList.remove("show");
+  nextRound();
+}
+function pauseGame() {
+  if (!gm.active || gm.paused) return;
+  gm.paused = true; gm.locked = true;
+  clearInterval(gm.timer); clearTimeout(gm.advance);
+  $("gStart").textContent = "Resume Game";
+  $("gMsg").textContent = "Game paused.";
+}
+function resumeGame() {
+  if (!gm.active || !gm.paused) return;
+  gm.paused = false;
+  $("gStart").textContent = "Pause Game";
+  if (gm.awaitingNext) {
+    gm.awaitingNext = false;
+    nextRound();
+  } else if (gm.cur) {
+    gm.locked = false;
+    $("gMsg").innerHTML = "Which word does <b>not</b> belong?";
+    startRoundTimer();
+  } else if (gm.loading) {
+    return;
+  } else {
+    nextRound();
+  }
+}
+function leaveGame() {
+  gm.run++; gm.active = false; gm.paused = false; gm.awaitingNext = false; gm.locked = true; gm.cur = null; gm.loading = false;
+  clearInterval(gm.timer); clearTimeout(gm.advance);
+  $("gStart").textContent = "Start Game";
+  $("gRound").textContent = "-"; $("gTimer").style.width = "100%";
+  $("gWords").innerHTML = "";
+  $("gMsg").innerHTML = "Tap the word that does <b>not</b> belong. The AI decides using word-embedding distances.";
+  $("modal").classList.remove("show");
+}
+$("gStart").onclick = () => {
+  if (!gm.active) startGame();
+  else if (gm.paused) resumeGame();
+  else pauseGame();
+};
+async function nextRound() {
+  clearInterval(gm.timer);
+  if (!gm.active || gm.paused) return;
+  if (gm.round >= TOTAL) return endGame();
+  const run = gm.run;
+  gm.loading = true;
+  gm.round++; $("gRound").textContent = gm.round; gm.locked = true; $("gMsg").innerHTML = "Which word does <b>not</b> belong?";
+  try {
+    gm.cur = await requestJson("/api/odd");
+  } catch (error) {
+    if (run !== gm.run || !gm.active) return;
+    gm.loading = false;
+    gm.active = false; gm.locked = true; $("gStart").textContent = "Start Game";
+    $("gMsg").textContent = error.message;
+    return;
+  }
+  if (run !== gm.run || !gm.active) return;
+  gm.loading = false;
+  $("gWords").innerHTML = gm.cur.words.map((w, i) => `<button data-i="${i}">${esc(w)}</button>`).join("");
+  $("gWords").querySelectorAll("button").forEach(b => b.onclick = () => choose(+b.dataset.i));
+  gm.t = 15; gm.locked = gm.paused;
+  $("gTimer").style.transition = "none"; $("gTimer").style.width = "100%"; void $("gTimer").offsetWidth; $("gTimer").style.transition = "width 1s linear";
+  if (gm.paused) $("gMsg").textContent = "Game paused.";
+  else { gm.locked = false; startRoundTimer(); }
+}
+function startRoundTimer() {
+  clearInterval(gm.timer);
+  gm.timer = setInterval(() => { gm.t--; $("gTimer").style.width = (gm.t / 15 * 100) + "%"; if (gm.t <= 3 && gm.t > 0) sfx.tick(); if (gm.t <= 0) choose(-1); }, 1000);
+}
+function choose(i) {
+  if (gm.locked || !gm.active || gm.paused) return; gm.locked = true; clearInterval(gm.timer);
+  const c = gm.cur, btns = $("gWords").querySelectorAll("button"), ok = i === c.answer;
+  btns[c.answer].classList.add("right"); if (i >= 0 && !ok) btns[i].classList.add("wrong");
+  btns[c.ai].insertAdjacentHTML("beforeend", '<span class="ai">&#129302;</span>');
+  if (ok) { gm.streak++; gm.score += 100 + gm.t * 5 + (gm.streak - 1) * 25; sfx.ok(); $("gMsg").innerHTML = '<span class="good">Correct!</span>'; } else { gm.streak = 0; sfx.bad(); $("gMsg").innerHTML = '<span class="badc">' + (i < 0 ? "Time's up!" : "Not quite!") + "</span>"; }
+  if (c.ai === c.answer) gm.ai += 100;
+  $("gMsg").innerHTML += ` &nbsp; AI picked <b>${esc(c.words[c.ai])}</b> ${c.ai === c.answer ? "(correct)" : "(wrong)"}`;
+  $("gScore").textContent = gm.score; $("gAi").textContent = gm.ai; $("gStreak").textContent = gm.streak;
+  gm.awaitingNext = true;
+  gm.advance = setTimeout(() => {
+    gm.awaitingNext = false;
+    nextRound();
+  }, 2000);
+}
+function loadHist() { try { return JSON.parse(localStorage.getItem("nlp_hist") || "[]"); } catch (e) { return []; } }
+function showHist() {
+  const h = loadHist(); $("gBest").textContent = h.reduce((m, x) => Math.max(m, x.s), 0);
+  $("hist").innerHTML = h.length ? "<b>Recent games</b><br>" + h.slice(-5).reverse().map(x => `${x.d}: You ${x.s} vs AI ${x.a} ${x.s > x.a ? "&#127942;" : x.s === x.a ? "&#129309;" : "&#129302;"}`).join("<br>") : "";
+}
+function endGame() {
+  gm.active = false; gm.paused = false; gm.awaitingNext = false; gm.locked = true;
+  clearInterval(gm.timer); clearTimeout(gm.advance);
+  $("gStart").textContent = "Start Game";
+  const hist = loadHist(); hist.push({ s: gm.score, a: gm.ai, d: new Date().toLocaleDateString() });
+  try { localStorage.setItem("nlp_hist", JSON.stringify(hist.slice(-20))); } catch (e) { }
+  showHist();
+  const win = gm.score > gm.ai ? "You beat the AI! &#127942;" : gm.score === gm.ai ? "It's a tie!" : "The AI wins this time &#129302;";
+  $("modal").innerHTML = `<div class="card"><h2>Game over</h2><div class="final">${gm.score} vs ${gm.ai}</div><p>${win}</p><button class="pink" id="again">Play Again</button><button class="alt" id="cl">Close</button></div>`;
+  $("modal").classList.add("show"); $("again").onclick = () => $("gStart").click(); $("cl").onclick = () => $("modal").classList.remove("show");
+}
+/* ---------- polish: dark mode, shortcuts, history ---------- */
+function setDark(on) {
+  document.body.classList.toggle("dark", on); $("dark").innerHTML = on ? "&#9728;&#65039;" : "&#127769;";
+  try { localStorage.setItem("nlp_dark", on ? "1" : "0"); } catch (e) { }
+}
+$("dark").onclick = () => setDark(!document.body.classList.contains("dark"));
+try { if (localStorage.getItem("nlp_dark") === "1") setDark(true); } catch (e) { }
+addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || !$("factory").classList.contains("on")) return;
+  if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); nextStage(); }
+  else if (e.key === "n" || e.key === "N") { newSentence(); }
+});
+showHist();
+renderSteps();
+</script>
+</body>
+</html>

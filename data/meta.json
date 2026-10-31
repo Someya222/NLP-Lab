@@ -1,0 +1,10 @@
+{
+  "max_len": 200,
+  "emb_dim": 100,
+  "vocab_size": 20002,
+  "token_regex": "[a-z]+(?:'[a-z]+)?",
+  "padding": "post",
+  "truncating": "post",
+  "test_accuracy": 0.8414,
+  "glove": true
+}
